@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Платформа симуляции фишинга & Оценки киберграмотности</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); padding: 20px; }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        .tag {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        /* Сетка дашборда */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 { font-size: 1.2rem; margin-bottom: 15px; color: #fff; }
+
+        /* Виджеты статистики */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-box .num { font-size: 1.8rem; font-weight: bold; margin-top: 5px; }
+        .stat-box.sent .num { color: var(--accent-blue); }
+        .stat-box.clicked .num { color: #f59e0b; }
+        .stat-box.compromised .num { color: var(--accent-red); }
+
+        /* Стили таблицы */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th { color: var(--text-muted); font-weight: 600; }
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .status-badge.danger { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        .status-badge.warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .status-badge.safe { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+
+        /* Конструктор ссылок */
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; }
+        select, input {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: #fff;
+            border-radius: 6px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:hover { background: #2563eb; }
+
+        /* Стили СИМУЛЯТОРА ФИШИНГА (Всплывающее демо-окно) */
+        .phishing-preview-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .phishing-browser {
+            width: 400px;
+            background: #fff;
+            color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+        }
+        .browser-bar {
+            background: #f1f5f9;
+            padding: 8px;
+            font-size: 0.75rem;
+            color: #64748b;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .browser-url {
+            background: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            color: var(--accent-red);
+            font-weight: bold;
+        }
+        .phishing-form {
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .phishing-form h3 { margin-bottom: 20px; color: #1e3a8a; }
+        .phishing-form input {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #000;
+            margin-bottom: 12px;
+        }
+        .phishing-form button { background: #1877f2; } /* Цвет кнопок соцсетей */
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>PhishEdu: Платформа тестирования киберграмотности</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Исследовательский проект контроля навыков Social Engineering</p>
+        </div>
+        <div class="tag">Режим симуляции</div>
+    </header>
+
+    <div class="dashboard-grid">
+        
+        <div>
+            <div class="stats-container">
+                <div class="stat-box sent">
+                    <div class="label">Отправлено писем</div>
+                    <div class="num" id="stat-sent">12</div>
+                </div>
+                <div class="stat-box clicked">
+                    <div class="label">Перешли по ссылке</div>
+                    <div class="num" id="stat-clicked">5</div>
+                </div>
+                <div class="stat-box compromised">
+                    <div class="label">Ввели данные (Скомпрометированы)</div>
+                    <div class="num" id="stat-comp">2</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Журнал активности (Лог тестирования)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Пользователь / Класс</th>
+                            <th>Тип атаки</th>
+                            <th>Статус</th>
+                            <th>Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table-body">
+                        <tr>
+                            <td>Иван И. (8-А класс)</td>
+                            <td>Фейковый конкурс Геймпада</td>
+                            <td><span class="status-badge danger">Ввёл пароль</span></td>
+                            <td>16.06.2026</td>
+                        </tr>
+                        <tr>
+                            <td>Анна К. (8-Б класс)</td>
+                            <td>Срочная смена пароля электропочты</td>
+                            <td><span class="status-badge warning">Перешла по ссылке</span></td>
+                            <td>16.06.2026</td>
+                        </tr>
+                        <tr>
+                            <td>Сергей В. (Преподаватель)</td>
+                            <td>Уведомление о крупном выигрыше</td>
+                            <td><span class="status-badge safe">Проигнорировано</span></td>
+                            <td>15.06.2026</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>Генератор фишинговой ссылки</h2>
+                <div class="input-group">
+                    <label>Шаблон безопасного письма</label>
+                    <select id="attack-template">
+                        <option value="Выигрыш">Голосование за старосту класса (Фейк)</option>
+                        <option value="Смена Пароля">Вход в Электронный Дневник (Фейк)</option>
+                        <option value="Раздача Игр">Бесплатная подписка / Игровая валюта</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Тестируемый (Имя или ID)</label>
+                    <input type="text" id="target-name" placeholder="Например: Петр Ц. (8-А)">
+                </div>
+                <button onclick="generatePhishLink()">Запустить симуляцию для пользователя</button>
+            </div>
+
+            <div class="card" style="text-align: center;">
+                <h2>График уязвимости</h2>
+                <canvas id="phishChart" style="max-height: 180px;"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="phishing-preview-modal" id="phish-modal">
+        <div class="phishing-browser">
+            <div class="browser-bar">
+                <span style="color: #ef4444;">● ● ●</span>
+                <div class="browser-url" id="fake-url">http://v0p0s-school-dnevnik.ru/login</div>
+            </div>
+            <div class="phishing-form">
+                <h3 id="phish-form-title">Авторизация через Личный Кабинет</h3>
+                <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 15px;">Для продолжения введите логин и пароль</p>
+                <input type="text" id="fake-user" placeholder="Логин (Email / Телефон)" required>
+                <input type="password" id="fake-pass" placeholder="Пароль" required>
+                <button onclick="submitFakeData()">Войти в систему</button>
+                <p style="font-size: 0.7rem; color: #94a3b8; margin-top: 15px; cursor: pointer;" onclick="closePhishModal()">✖ Закрыть окно симуляции</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация графика Chart.js
+        const ctx = document.getElementById('phishChart').getContext('2d');
+        let phishChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Игнорировали', 'Кликнули', 'Скомпрометированы'],
+                datasets: [{
+                    data: [5, 3, 2],
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                plugins: { legend: { labels: { color: '#f8fafc' } } }
+            }
+        });
+
+        // Глобальные переменные для отслеживания текущего созданного теста
+        let currentTarget = "";
+        let currentTemplate = "";
+
+        // Логика кнопки "Запустить симуляцию"
+        function generatePhishLink() {
+            const nameInput = document.getElementById('target-name');
+            const templateSelect = document.getElementById('attack-template');
+
+            if (!nameInput.value.trim()) {
+                alert("Пожалуйста, введите имя тестируемого пользователя/класса");
+                return;
+            }
+
+            currentTarget = nameInput.value;
+            currentTemplate = templateSelect.options[templateSelect.selectedIndex].text;
+
+            // Настройка "фейкового URL" под выбранный шаблон
+            const fakeUrlBlock = document.getElementById('fake-url');
+            if (templateSelect.value === "Смена Пароля") {
+                fakeUrlBlock.innerText = "http://inf0-shkola-dnevnik.net/auth";
+                document.getElementById('phish-form-title').innerText = "Вход в Электронный Дневник";
+            } else if (templateSelect.value === "Раздача Игр") {
+                fakeUrlBlock.innerText = "http://free-steam-keys-giveaway.org/login";
+                document.getElementById('phish-form-title').innerText = "Получить бесплатный доступ";
+            } else {
+                fakeUrlBlock.innerText = "http://shkola-golosovanie-2026.ru";
+                document.getElementById('phish-form-title').innerText = "Голосование за Лидера";
+            }
+
+            // Обновляем статистику: Отправлено +1
+            updateStat('stat-sent', 1);
+
+            // Показываем фишинговое окно (имитируем, что пользователь нажал на ссылку в письме)
+            alert(`Симуляция запущена!\nПредставим, что пользователю ${currentTarget} ушло письмо. Сейчас откроется окно, которое он увидит при клике.`);
+            
+            document.getElementById('phish-modal').style.display = 'flex';
+            
+            // Записываем в лог промежуточный результат (кликнул)
+            updateStat('stat-clicked', 1
